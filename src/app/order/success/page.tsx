@@ -1,45 +1,3 @@
-// "use client";
-// import { useSearchParams } from "next/navigation";
-// import { useEffect, useState } from "react";
-
-// export default function OrderSuccess() {
-//   const searchParams = useSearchParams();
-//   const orderId = searchParams.get("orderId");
-//   const [order, setOrder] = useState<any>(null);
-
-//   useEffect(() => {
-//     const fetchOrder = async () => {
-//       if (!orderId) return;
-//       const res = await fetch(`/api/orders/${orderId}`);
-//       const data = await res.json();
-//       setOrder(data.order);
-//     };
-//     fetchOrder();
-//   }, [orderId]);
-
-//   if (!order) return <div className="p-8 text-center">Loading...</div>;
-
-//   return (
-//     <div className="p-8 text-center">
-//       <h1 className="text-3xl font-bold mb-4 text-green-600">
-//         Order Created Successfully 🎉
-//       </h1>
-//       <p className="text-xl mb-2">Order ID: {order.orderNumber}</p>
-//       <img
-//         src={order.qrCode}
-//         alt="QR Code"
-//         className="mx-auto border rounded shadow-md"
-//         width={200}
-//       />
-//       <p className="mt-4 text-gray-600">
-//         You can track your order anytime using this QR code.
-//       </p>
-//     </div>
-//   );
-// }
-
-
-
 "use client";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -55,7 +13,7 @@ export default function OrderSuccess() {
       if (!orderId) return;
       try {
         const res = await fetch(`/api/orders/${orderId}`, {
-          headers: { "x-user-role": "user" }, // ✅ Hide QR from user
+          headers: { "x-user-role": "user" },
         });
         const data = await res.json();
         setOrder(data.order);
@@ -89,8 +47,7 @@ export default function OrderSuccess() {
         order has been placed successfully.
       </p>
       <p className="text-xl font-semibold mb-6">
-        Order Number:{" "}
-        <span className="text-blue-600">{order.orderNumber}</span>
+        Order Number: <span className="text-blue-600">{order.orderNumber}</span>
       </p>
 
       {/* 🛍️ Products Summary */}
@@ -108,30 +65,33 @@ export default function OrderSuccess() {
                 Qty: {product.quantity} × ₹{product.price}
               </p>
 
-              {/* Show customization only if product has customization */}
               {product.isCustomized && product.customization && (
                 <div className="mt-3 bg-white border rounded-md p-3">
                   <h4 className="font-medium mb-2 text-blue-700">
                     Customization Details
                   </h4>
 
-                  {/* 🧒 Student info */}
                   <div className="text-sm text-gray-700 space-y-1">
                     {product.customization.textData?.name && (
                       <p>👶 Name: {product.customization.textData.name}</p>
                     )}
                     {product.customization.textData?.className && (
-                      <p>📚 Class: {product.customization.textData.className}</p>
+                      <p>
+                        📚 Class: {product.customization.textData.className}
+                      </p>
                     )}
                     {product.customization.textData?.section && (
-                      <p>📂 Section: {product.customization.textData.section}</p>
+                      <p>
+                        📂 Section: {product.customization.textData.section}
+                      </p>
                     )}
                     {product.customization.textData?.schoolName && (
-                      <p>🏫 School: {product.customization.textData.schoolName}</p>
+                      <p>
+                        🏫 School: {product.customization.textData.schoolName}
+                      </p>
                     )}
                   </div>
 
-                  {/* 🖋️ Font, Color, Style */}
                   <div className="mt-2 text-sm text-gray-700 space-y-1">
                     {product.customization.font && (
                       <p>🖋️ Font: {product.customization.font}</p>
@@ -158,10 +118,11 @@ export default function OrderSuccess() {
                     )}
                   </div>
 
-                  {/* 🖼️ Photo previews */}
                   {product.customization.photoUrls?.length > 0 && (
                     <div className="mt-3">
-                      <p className="font-medium text-sm mb-1">Uploaded Photos:</p>
+                      <p className="font-medium text-sm mb-1">
+                        Uploaded Photos:
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {product.customization.photoUrls.map(
                           (url: string, i: number) => (
@@ -177,7 +138,6 @@ export default function OrderSuccess() {
                     </div>
                   )}
 
-                  {/* 🧾 Preview Image */}
                   {product.customization.previewImage && (
                     <div className="mt-3">
                       <p className="font-medium text-sm mb-1">Preview Image:</p>
@@ -192,7 +152,6 @@ export default function OrderSuccess() {
               )}
             </div>
 
-            {/* Product image */}
             {product.imageUrl && (
               <img
                 src={product.imageUrl}
@@ -203,13 +162,11 @@ export default function OrderSuccess() {
           </div>
         ))}
 
-        {/* 💰 Total */}
         <div className="text-right mt-5 font-semibold text-lg">
           Total: ₹{order.total}
         </div>
       </div>
 
-      {/* 🚚 Tracking Section */}
       <div className="mt-6">
         <p className="text-gray-700 mb-3">
           You can track your order status anytime using the link below:

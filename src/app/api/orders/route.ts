@@ -1,32 +1,3 @@
-// import { NextResponse } from "next/server";
-// import { connectDB } from "../db/connect";
-// import Order from "@/models/Order";
-// import { generateOrderId } from "@/utils/generateOrderId";
-// import { generateQR } from "@/utils/generateQR";
-
-// export async function POST(req: Request) {
-//   try {
-//     await connectDB();
-//     const data = await req.json();
-
-//     const orderNumber = await generateOrderId();
-//     const qrCode = await generateQR(
-//       `${process.env.BASE_URL}/order/track/${orderNumber}`
-//     );
-
-//     const newOrder = await Order.create({
-//       ...data,
-//       orderNumber,
-//       qrCode,
-//     });
-
-//     return NextResponse.json({ success: true, order: newOrder });
-//   } catch (error: any) {
-//     console.error(error);
-//     return NextResponse.json({ success: false, message: error.message });
-//   }
-// }
-
 import { NextResponse } from "next/server";
 import { connectDB } from "../db/connect";
 import Order from "@/models/Order";
@@ -39,9 +10,19 @@ function hasCustomizationPayload(p: any) {
   if (p.customization) {
     const c = p.customization;
     const text = c.textData || {};
-    const textHas = Object.values(text).some((v: any) => v !== undefined && v !== null && String(v).trim() !== "");
+    const textHas = Object.values(text).some(
+      (v: any) => v !== undefined && v !== null && String(v).trim() !== ""
+    );
     const photos = Array.isArray(c.photoUrls) && c.photoUrls.length > 0;
-    return textHas || photos || !!c.font || !!c.color || !!c.style || !!c.previewImage || !!c.printFile;
+    return (
+      textHas ||
+      photos ||
+      !!c.font ||
+      !!c.color ||
+      !!c.style ||
+      !!c.previewImage ||
+      !!c.printFile
+    );
   }
   return false;
 }
@@ -52,12 +33,17 @@ export async function POST(req: Request) {
     const data = await req.json();
 
     if (!data || !Array.isArray(data.products) || data.products.length === 0) {
-      return NextResponse.json({ success: false, message: "Invalid payload: products required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Invalid payload: products required" },
+        { status: 400 }
+      );
     }
 
     // 1️⃣ Generate Order ID & QR
     const orderNumber = await generateOrderId();
-    const qrCode = await generateQR(`${process.env.BASE_URL}/order/track/${orderNumber}`);
+    const qrCode = await generateQR(
+      `${process.env.BASE_URL}/order/track/${orderNumber}`
+    );
 
     // 2️⃣ Format all products (including customization when present)
     const products = data.products.map((p: any) => {
@@ -85,20 +71,27 @@ export async function POST(req: Request) {
               schoolName: p.customization?.textData?.schoolName || "",
               section: p.customization?.textData?.section || "",
             },
-            photoUrls: Array.isArray(p.customization?.photoUrls) ? p.customization.photoUrls : (p.customization?.photoUrls ? [p.customization.photoUrls] : []),
+            photoUrls: Array.isArray(p.customization?.photoUrls)
+              ? p.customization.photoUrls
+              : p.customization?.photoUrls
+              ? [p.customization.photoUrls]
+              : [],
             font: p.customization?.font || "",
             color: p.customization?.color || "",
             style: p.customization?.style || "",
             isCartoonStyle: !!p.customization?.isCartoonStyle,
             previewImage: p.customization?.previewImage || p.previewImage || "",
             printFile: p.customization?.printFile || "",
-          }
-        })
+          },
+        }),
       };
     });
 
     // 3️⃣ Totals
-    const subtotal = products.reduce((acc: number, pr: any) => acc + (Number(pr.totalPrice) || 0), 0);
+    const subtotal = products.reduce(
+      (acc: number, pr: any) => acc + (Number(pr.totalPrice) || 0),
+      0
+    );
     const tax = Number(data.tax || 0);
     const shipping = Number(data.shipping || 0);
     const discount = Number(data.discount || 0);
@@ -147,9 +140,12 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("❌ Order Creation Error:", error);
-    return NextResponse.json({
-      success: false,
-      message: error.message || "Failed to create order",
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || "Failed to create order",
+      },
+      { status: 500 }
+    );
   }
 }

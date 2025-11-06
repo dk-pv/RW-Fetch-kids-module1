@@ -39,18 +39,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1️⃣ Generate Order ID & QR
+    if (!data.userEmail || !data.userName) {
+      return NextResponse.json(
+        { success: false, message: "User name and email are required" },
+        { status: 400 }
+      );
+    }
+
     const orderNumber = await generateOrderId();
     const qrCode = await generateQR(
       `${process.env.BASE_URL}/order/track/${orderNumber}`
     );
 
-    // 2️⃣ Format all products (including customization when present)
     const products = data.products.map((p: any) => {
       const price = Number(p.price || 0);
       const qty = Number(p.quantity || 0);
       const totalPrice = price * qty;
-
       const includeCustomization = hasCustomizationPayload(p);
 
       return {
@@ -61,7 +65,6 @@ export async function POST(req: Request) {
         totalPrice,
         imageUrl: p.imageUrl || "",
         isCustomized: !!includeCustomization,
-        // only attach customization when there is meaningful customization data
         ...(includeCustomization && {
           customization: {
             isCustomized: true,
@@ -87,7 +90,6 @@ export async function POST(req: Request) {
       };
     });
 
-    // 3️⃣ Totals
     const subtotal = products.reduce(
       (acc: number, pr: any) => acc + (Number(pr.totalPrice) || 0),
       0
@@ -97,8 +99,33 @@ export async function POST(req: Request) {
     const discount = Number(data.discount || 0);
     const total = subtotal + tax + shipping - discount;
 
-    // 4️⃣ Construct new order object
-    const newOrderData: any = {
+    const addr = data.shippingAddress || {};
+    const shippingAddress = {
+      userName: addr.userName || data.userName || "",
+      phone: addr.phone || data.phone || "",
+      alternatePhone: addr.alternatePhone || "",
+      postalCode: addr.postalCode || "",
+      locality: addr.locality || "",
+      street: addr.street || "",
+      city: addr.city || "",
+      state: addr.state || "",
+      country: addr.country || "India",
+      landmark: addr.landmark || "",
+      addressType: addr.addressType || "home",
+    };
+
+    if (
+      !shippingAddress.postalCode ||
+      !shippingAddress.street ||
+      !shippingAddress.city
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Incomplete shipping address" },
+        { status: 400 }
+      );
+    }
+
+    const newOrderData = {
       orderNumber,
       qrCode,
       userId: data.userId || null,
@@ -111,16 +138,7 @@ export async function POST(req: Request) {
       shipping,
       discount,
       total,
-      shippingAddress: {
-        firstName: data.shippingAddress?.firstName || "",
-        lastName: data.shippingAddress?.lastName || "",
-        street: data.shippingAddress?.street || "",
-        city: data.shippingAddress?.city || "",
-        state: data.shippingAddress?.state || "",
-        postalCode: data.shippingAddress?.postalCode || "",
-        country: data.shippingAddress?.country || "India",
-        phone: data.shippingAddress?.phone || "",
-      },
+      shippingAddress,
       paymentMethod: data.paymentMethod || "cod",
       paymentStatus: data.paymentStatus || "pending",
       status: "pending",
@@ -129,10 +147,8 @@ export async function POST(req: Request) {
       previewImage: data.previewImage || "",
     };
 
-    // 5️⃣ Save to DB
     const newOrder = await Order.create(newOrderData);
 
-    // 6️⃣ Return Response
     return NextResponse.json({
       success: true,
       message: "Order created successfully",
@@ -141,10 +157,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("❌ Order Creation Error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        message: error.message || "Failed to create order",
-      },
+      { success: false, message: error.message || "Failed to create order" },
       { status: 500 }
     );
   }

@@ -30,6 +30,28 @@ const ProductSchema = new Schema({
   customization: { type: CustomizationSchema, default: () => ({}) },
 });
 
+const ShippingAddressSchema = new Schema(
+  {
+    userName: { type: String, required: true }, 
+    phone: { type: String, required: true },
+    alternatePhone: { type: String, required: true },
+    postalCode: { type: String, required: true }, 
+    locality: { type: String, required: true }, 
+    street: { type: String, required: true }, 
+    city: { type: String, required: true }, 
+    state: { type: String, required: true },
+    country: { type: String, default: "India", required: true },
+    landmark: { type: String, default: "" },
+    addressType: {
+      type: String,
+      enum: ["home", "work", "other"],
+      default: "home",
+      required: true,
+    },
+  },
+  { _id: false } 
+);
+
 const OrderSchema = new Schema(
   {
     orderNumber: { type: String, unique: true, required: true },
@@ -38,7 +60,7 @@ const OrderSchema = new Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     userName: { type: String, required: true },
     userEmail: { type: String, required: true },
-    phone: String,
+    phone: { type: String, required: true },
 
     products: [ProductSchema],
 
@@ -48,18 +70,9 @@ const OrderSchema = new Schema(
     discount: { type: Number, default: 0 },
     total: { type: Number, required: true },
 
-    shippingAddress: {
-      firstName: String,
-      lastName: String,
-      street: String,
-      city: String,
-      state: String,
-      postalCode: String,
-      country: { type: String, default: "India" },
-      phone: String,
-    },
+    shippingAddress: { type: ShippingAddressSchema, required: true },
 
-    paymentMethod: { type: String, default: "cod" },
+    paymentMethod: { type: String, default: "cod", required: true },
     paymentStatus: { type: String, default: "pending" },
     stripeSessionId: String,
     stripePaymentIntentId: String,
@@ -95,9 +108,7 @@ const OrderSchema = new Schema(
 );
 
 OrderSchema.pre("save", async function (next) {
-  if (!this.orderNumber) {
-    this.orderNumber = await generateOrderId();
-  }
+  if (!this.orderNumber) this.orderNumber = await generateOrderId();
   if (!this.qrCode) {
     const qrLink = `${process.env.BASE_URL}/order/track/${this.orderNumber}`;
     this.qrCode = await QRCode.toDataURL(qrLink);

@@ -24,15 +24,46 @@ type ProductType = {
   previewUrl: string;
 };
 
+type AddressType = {
+  userName: string;
+  phone: string;
+  alternatePhone: string;
+  postalCode: string;
+  locality: string;
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  landmark: string;
+  addressType: string;
+};
+
 export default function OrderPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [isFetchingPincode, setIsFetchingPincode] = useState(false);
+  const [pincodeError, setPincodeError] = useState("");
 
   const [form, setForm] = useState({
     userName: "",
     userEmail: "",
     phone: "",
+  });
+
+  const [address, setAddress] = useState<AddressType>({
+    userName: "",
+    phone: "",
+    alternatePhone: "",
+    postalCode: "",
+    locality: "",
+    street: "",
+    city: "",
+    state: "",
+    country: "India",
+    landmark: "",
+    addressType: "home",
   });
 
   const [products, setProducts] = useState<ProductType[]>([
@@ -54,26 +85,16 @@ export default function OrderPage() {
     },
   ]);
 
-  const handleFileUpload = useCallback(
-    async (
-      file: File,
-      folder = "fetchkids/orders/photos",
-      fileType = "photo"
-    ) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", folder);
-      formData.append("fileType", fileType);
+  const handleFileUpload = useCallback(async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", "fetchkids/orders/photos");
+    formData.append("fileType", "photo");
 
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      return data.url || "";
-    },
-    []
-  );
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    return data.url || "";
+  }, []);
 
   const addProduct = useCallback(() => {
     setProducts((prev) => [
@@ -141,177 +162,140 @@ export default function OrderPage() {
   const handleImageChange = useCallback(
     async (index: number, file: File | null) => {
       if (!file) return;
-
       const blobUrl = URL.createObjectURL(file);
       setProducts((prev) =>
         prev.map((p, i) =>
           i === index ? { ...p, previewUrl: blobUrl, photoFile: file } : p
         )
       );
-
       try {
-        const cloudUrl = await handleFileUpload(
-          file,
-          "fetchkids/orders/photos",
-          "photo"
-        );
-
+        const cloudUrl = await handleFileUpload(file);
         setProducts((prev) =>
-          prev.map((p, i) => {
-            if (i !== index) return p;
-
-            if (
-              p.previewUrl &&
-              p.previewUrl.startsWith("blob:") &&
-              p.previewUrl !== cloudUrl
-            ) {
-              try {
-                URL.revokeObjectURL(p.previewUrl);
-              } catch (e) {}
-            }
-            return {
-              ...p,
-              previewUrl: cloudUrl,
-              photoFile: null,
-              customization: { ...p.customization, photoUrls: [cloudUrl] },
-            };
-          })
-        );
-      } catch (err) {}
-    },
-    [handleFileUpload]
-  );
-
-  const ensureUploadsComplete = useCallback(
-    async (items: ProductType[]) => {
-      return Promise.all(
-        items.map(async (p) => {
-          if (p.customization.photoUrls && p.customization.photoUrls.length > 0)
-            return p;
-
-          if (p.photoFile) {
-            try {
-              const cloudUrl = await handleFileUpload(
-                p.photoFile,
-                "fetchkids/orders/photos",
-                "photo"
-              );
-              if (
-                p.previewUrl &&
-                p.previewUrl.startsWith("blob:") &&
-                p.previewUrl !== cloudUrl
-              ) {
-                try {
-                  URL.revokeObjectURL(p.previewUrl);
-                } catch {}
-              }
-              return {
-                ...p,
-                previewUrl: cloudUrl,
-                photoFile: null,
-                customization: { ...p.customization, photoUrls: [cloudUrl] },
-              };
-            } catch {
-              return p;
-            }
-          }
-
-          return p;
-        })
-      );
-    },
-    [handleFileUpload]
-  );
-
-  const handleSubmit = useCallback(
-    async (e: any) => {
-      e.preventDefault();
-      startTransition(async () => {
-        setLoading(true);
-
-        const uploadedProducts = await ensureUploadsComplete(products);
-
-        const subtotal = uploadedProducts.reduce(
-          (sum, p) => sum + Number(p.price || 0) * Number(p.quantity || 0),
-          0
-        );
-
-        const orderProducts = uploadedProducts.map((p) => {
-          const hasCustomization =
-            p.isCustomized ||
-            Object.values(p.customization.textData).some((v) => !!v) ||
-            (p.customization.photoUrls &&
-              p.customization.photoUrls.length > 0) ||
-            !!p.customization.font ||
-            !!p.customization.style;
-
-          return {
-            name: p.name,
-            price: Number(p.price || 0),
-            quantity: Number(p.quantity || 0),
-            isCustomized: hasCustomization,
-            imageUrl: p.previewUrl || "",
-            customization: hasCustomization
+          prev.map((p, i) =>
+            i === index
               ? {
-                  isCustomized: true,
-                  textData: p.customization.textData,
-                  photoUrls: p.customization.photoUrls || [],
-                  font: p.customization.font,
-                  color: p.customization.color,
-                  style: p.customization.style,
-                  isCartoonStyle: p.customization.isCartoonStyle,
-                  previewImage: p.previewUrl || "",
-                  printFile: "",
+                  ...p,
+                  previewUrl: cloudUrl,
+                  photoFile: null,
+                  customization: { ...p.customization, photoUrls: [cloudUrl] },
                 }
-              : {},
-          };
-        });
-
-        const orderData = {
-          userName: form.userName,
-          userEmail: form.userEmail,
-          phone: form.phone,
-          products: orderProducts,
-          subtotal,
-          tax: 0,
-          shipping: 0,
-          total: subtotal,
-          shippingAddress: {
-            firstName: form.userName.split(" ")[0] || "",
-            lastName: form.userName.split(" ")[1] || "",
-            street: "N/A",
-            city: "N/A",
-            state: "Kerala",
-            postalCode: "000000",
-            phone: form.phone,
-          },
-          paymentMethod: "cod",
-        };
-
-        try {
-          const res = await fetch("/api/orders", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(orderData),
-          });
-          const data = await res.json();
-          setLoading(false);
-
-          if (data?.success) {
-            router.push(`/order/success?orderId=${data.order.orderNumber}`);
-          } else {
-            alert(
-              "Order creation failed: " + (data?.message || "Server error")
-            );
-          }
-        } catch (err) {
-          setLoading(false);
-          alert("Network error creating order");
-        }
-      });
+              : p
+          )
+        );
+      } catch {}
     },
-    [ensureUploadsComplete, form, products, router]
+    [handleFileUpload]
   );
+
+  const handleSubmit = (e: any) => {
+    e.preventDefault();
+    setAddress((a) => ({
+      ...a,
+      userName: form.userName,
+      phone: form.phone,
+    }));
+    setShowAddressModal(true);
+  };
+
+  const handlePincodeChange = async (value: string) => {
+    setAddress((a) => ({ ...a, postalCode: value }));
+    setPincodeError("");
+    if (value.length === 6) {
+      setIsFetchingPincode(true);
+      try {
+        const res = await fetch(
+          `https://api.postalpincode.in/pincode/${value}`
+        );
+        const data = await res.json();
+        if (Array.isArray(data) && data[0]?.Status === "Success") {
+          const postOffice = data[0].PostOffice?.[0];
+          setAddress((a) => ({
+            ...a,
+            city: postOffice?.District || "",
+            state: postOffice?.State || "",
+          }));
+        } else {
+          setPincodeError("Invalid Pincode or not found");
+        }
+      } catch {
+        setPincodeError("Failed to fetch location");
+      } finally {
+        setIsFetchingPincode(false);
+      }
+    }
+  };
+
+  const handleConfirmCheckout = async () => {
+    setLoading(true);
+    setShowAddressModal(false);
+
+    const subtotal = products.reduce(
+      (sum, p) => sum + Number(p.price || 0) * Number(p.quantity || 0),
+      0
+    );
+
+    const orderProducts = products.map((p) => {
+      const hasCustomization =
+        p.isCustomized ||
+        Object.values(p.customization.textData).some((v) => !!v) ||
+        (p.customization.photoUrls?.length ?? 0) > 0 ||
+        !!p.customization.font ||
+        !!p.customization.style;
+
+      return {
+        name: p.name,
+        price: Number(p.price || 0),
+        quantity: Number(p.quantity || 0),
+        isCustomized: hasCustomization,
+        imageUrl: p.previewUrl || "",
+        customization: hasCustomization
+          ? {
+              isCustomized: true,
+              textData: p.customization.textData,
+              photoUrls: p.customization.photoUrls || [],
+              font: p.customization.font,
+              color: p.customization.color,
+              style: p.customization.style,
+              isCartoonStyle: p.customization.isCartoonStyle,
+              previewImage: p.previewUrl || "",
+              printFile: "",
+            }
+          : {},
+      };
+    });
+
+    const orderData = {
+      userName: form.userName,
+      userEmail: form.userEmail,
+      phone: form.phone,
+      products: orderProducts,
+      subtotal,
+      tax: 0,
+      shipping: 0,
+      total: subtotal,
+      shippingAddress: address,
+      paymentMethod: "cod",
+    };
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      });
+      const data = await res.json();
+      setLoading(false);
+
+      if (data?.success) {
+        router.push(`/order/checkout/${data.order.orderNumber}`);
+      } else {
+        alert("Order creation failed: " + (data?.message || "Server error"));
+      }
+    } catch {
+      setLoading(false);
+      alert("Network error");
+    }
+  };
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -319,6 +303,7 @@ export default function OrderPage() {
         Create New Order
       </h1>
 
+      {/* Order Form */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <h2 className="text-lg font-medium">Customer Info</h2>
         <input
@@ -345,158 +330,90 @@ export default function OrderPage() {
         />
 
         <h2 className="text-lg font-medium mt-6">Products</h2>
-
         {products.map((p, index) => (
           <div key={index} className="border rounded p-4 mb-4">
-            <div className="flex flex-col gap-2">
+            <input
+              placeholder="Product Name"
+              value={p.name}
+              onChange={(e) =>
+                handleProductChange(index, "name", e.target.value)
+              }
+              className="border p-2 rounded mb-2"
+              required
+            />
+            <input
+              placeholder="Price"
+              value={p.price}
+              onChange={(e) =>
+                handleProductChange(index, "price", e.target.value)
+              }
+              className="border p-2 rounded mb-2"
+              required
+            />
+            <input
+              placeholder="Quantity"
+              value={p.quantity}
+              onChange={(e) =>
+                handleProductChange(index, "quantity", e.target.value)
+              }
+              className="border p-2 rounded mb-2"
+              required
+            />
+            <div className="flex items-center gap-2 mb-2">
               <input
-                placeholder="Product Name"
-                value={p.name}
+                type="checkbox"
+                checked={p.isCustomized}
                 onChange={(e) =>
-                  handleProductChange(index, "name", e.target.value)
+                  handleProductChange(index, "isCustomized", e.target.checked)
                 }
-                className="border p-2 rounded"
-                required
               />
-              <input
-                placeholder="Price"
-                inputMode="numeric"
-                value={String(p.price)}
-                onChange={(e) =>
-                  handleProductChange(index, "price", e.target.value)
-                }
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                placeholder="Quantity"
-                inputMode="numeric"
-                value={String(p.quantity)}
-                onChange={(e) =>
-                  handleProductChange(index, "quantity", e.target.value)
-                }
-                className="border p-2 rounded"
-                required
-              />
-
-              <div className="flex items-center gap-2 mt-2">
-                <input
-                  id={`customize-${index}`}
-                  type="checkbox"
-                  checked={p.isCustomized}
-                  onChange={(e) =>
-                    handleProductChange(index, "isCustomized", e.target.checked)
-                  }
-                />
-                <label htmlFor={`customize-${index}`}>
-                  Customize this product?
-                </label>
-              </div>
-
-              {p.isCustomized && (
-                <div className="border-t pt-3 mt-3">
-                  <h3 className="font-medium mb-2">Customization Details</h3>
-
-                  <input
-                    placeholder="Student Name"
-                    value={p.customization.textData.name}
-                    onChange={(e) =>
-                      handleTextDataChange(index, "name", e.target.value)
-                    }
-                    className="border p-2 rounded mb-2"
-                  />
-                  <input
-                    placeholder="Class"
-                    value={p.customization.textData.className}
-                    onChange={(e) =>
-                      handleTextDataChange(index, "className", e.target.value)
-                    }
-                    className="border p-2 rounded mb-2"
-                  />
-                  <input
-                    placeholder="Section"
-                    value={p.customization.textData.section}
-                    onChange={(e) =>
-                      handleTextDataChange(index, "section", e.target.value)
-                    }
-                    className="border p-2 rounded mb-2"
-                  />
-                  <input
-                    placeholder="School Name"
-                    value={p.customization.textData.schoolName}
-                    onChange={(e) =>
-                      handleTextDataChange(index, "schoolName", e.target.value)
-                    }
-                    className="border p-2 rounded mb-2"
-                  />
-
-                  <div className="flex items-center gap-3 mb-2">
-                    <label>Font:</label>
-                    <input
-                      placeholder="Font"
-                      value={p.customization.font}
-                      onChange={(e) =>
-                        handleCustomizationChange(index, "font", e.target.value)
-                      }
-                      className="border p-2 rounded flex-1"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3 mb-2">
-                    <label>Color:</label>
-                    <input
-                      type="color"
-                      value={p.customization.color}
-                      onChange={(e) =>
-                        handleCustomizationChange(
-                          index,
-                          "color",
-                          e.target.value
-                        )
-                      }
-                      className="border p-1 rounded w-16"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3 mb-2">
-                    <label>Style:</label>
-                    <input
-                      placeholder="Style (optional)"
-                      value={p.customization.style}
-                      onChange={(e) =>
-                        handleCustomizationChange(
-                          index,
-                          "style",
-                          e.target.value
-                        )
-                      }
-                      className="border p-2 rounded flex-1"
-                    />
-                  </div>
-
-                  <h4 className="text-sm font-medium mt-2">Upload Photo</h4>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      handleImageChange(index, e.target.files?.[0] || null)
-                    }
-                    className="border p-2 rounded"
-                  />
-
-                  {p.previewUrl && (
-                    <div className="mt-2 text-center">
-                      <img
-                        src={p.previewUrl}
-                        alt={`${p.name || "product"} preview`}
-                        className="rounded shadow-md mx-auto max-h-40"
-                        loading="lazy"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+              <label>Customize?</label>
             </div>
+            {p.isCustomized && (
+              <div className="border-t pt-3">
+                <h3 className="font-medium mb-2">Customization</h3>
+                <input
+                  placeholder="Student Name"
+                  value={p.customization.textData.name}
+                  onChange={(e) =>
+                    handleTextDataChange(index, "name", e.target.value)
+                  }
+                  className="border p-2 rounded mb-2"
+                />
+                <input
+                  placeholder="Class"
+                  value={p.customization.textData.className}
+                  onChange={(e) =>
+                    handleTextDataChange(index, "className", e.target.value)
+                  }
+                  className="border p-2 rounded mb-2"
+                />
+                <input
+                  placeholder="School Name"
+                  value={p.customization.textData.schoolName}
+                  onChange={(e) =>
+                    handleTextDataChange(index, "schoolName", e.target.value)
+                  }
+                  className="border p-2 rounded mb-2"
+                />
+                <h4>Upload Photo</h4>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    handleImageChange(index, e.target.files?.[0] || null)
+                  }
+                  className="border p-2 rounded"
+                />
+                {p.previewUrl && (
+                  <img
+                    src={p.previewUrl}
+                    alt="preview"
+                    className="mt-2 rounded shadow mx-auto max-h-40"
+                  />
+                )}
+              </div>
+            )}
           </div>
         ))}
 
@@ -504,20 +421,166 @@ export default function OrderPage() {
           <button
             type="button"
             onClick={addProduct}
-            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
+            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
           >
-            + Add Another Product
+            + Add Product
           </button>
-
           <button
             type="submit"
             disabled={loading || isPending}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded mt-0 transition disabled:opacity-50"
+            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading || isPending ? "Processing..." : "Submit Order"}
+            {loading ? "Processing..." : "Submit Order"}
           </button>
         </div>
       </form>
+
+      {showAddressModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold mb-4 text-center">
+              Enter Shipping Address
+            </h2>
+
+            <div className="grid gap-3">
+              <input
+                placeholder="Full Name"
+                value={address.userName}
+                onChange={(e) =>
+                  setAddress((a) => ({ ...a, userName: e.target.value }))
+                }
+                className="border p-2 rounded"
+              />
+              <input
+                placeholder="Mobile Number"
+                value={address.phone}
+                onChange={(e) =>
+                  setAddress((a) => ({ ...a, phone: e.target.value }))
+                }
+                className="border p-2 rounded"
+              />
+              <input
+                placeholder="Alternate Phone"
+                value={address.alternatePhone}
+                onChange={(e) =>
+                  setAddress((a) => ({ ...a, alternatePhone: e.target.value }))
+                }
+                className="border p-2 rounded"
+              />
+              <input
+                placeholder="Pincode"
+                value={address.postalCode}
+                onChange={(e) => handlePincodeChange(e.target.value)}
+                className="border p-2 rounded"
+                maxLength={6}
+              />
+              {isFetchingPincode && (
+                <p className="text-sm text-gray-500">Fetching location...</p>
+              )}
+              {pincodeError && (
+                <p className="text-sm text-red-600">{pincodeError}</p>
+              )}
+              <input
+                placeholder="Locality / Area"
+                value={address.locality}
+                onChange={(e) =>
+                  setAddress((a) => ({ ...a, locality: e.target.value }))
+                }
+                className="border p-2 rounded"
+              />
+              <input
+                placeholder="Address (House No / Building)"
+                value={address.street}
+                onChange={(e) =>
+                  setAddress((a) => ({ ...a, street: e.target.value }))
+                }
+                className="border p-2 rounded"
+              />
+              <input
+                placeholder="City"
+                value={address.city}
+                readOnly
+                className="border p-2 rounded bg-gray-100"
+              />
+              <input
+                placeholder="State"
+                value={address.state}
+                readOnly
+                className="border p-2 rounded bg-gray-100"
+              />
+              <input
+                placeholder="Country"
+                value={address.country}
+                readOnly
+                className="border p-2 rounded bg-gray-100"
+              />
+              <input
+                placeholder="Landmark (Optional)"
+                value={address.landmark}
+                onChange={(e) =>
+                  setAddress((a) => ({ ...a, landmark: e.target.value }))
+                }
+                className="border p-2 rounded"
+              />
+
+              <div className="flex items-center gap-4 mt-2">
+                <label>
+                  <input
+                    type="radio"
+                    name="addressType"
+                    value="home"
+                    checked={address.addressType === "home"}
+                    onChange={(e) =>
+                      setAddress((a) => ({ ...a, addressType: e.target.value }))
+                    }
+                  />{" "}
+                  Home
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="addressType"
+                    value="work"
+                    checked={address.addressType === "work"}
+                    onChange={(e) =>
+                      setAddress((a) => ({ ...a, addressType: e.target.value }))
+                    }
+                  />{" "}
+                  Work
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="addressType"
+                    value="other"
+                    checked={address.addressType === "other"}
+                    onChange={(e) =>
+                      setAddress((a) => ({ ...a, addressType: e.target.value }))
+                    }
+                  />{" "}
+                  Other
+                </label>
+              </div>
+
+              <div className="flex justify-between mt-4">
+                <button
+                  onClick={() => setShowAddressModal(false)}
+                  className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmCheckout}
+                  disabled={loading}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                >
+                  Continue to Checkout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

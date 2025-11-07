@@ -42,7 +42,7 @@ const ShippingAddressSchema = new Schema(
     district: { type: String, required: true },
     state: { type: String, required: true },
     country: { type: String, default: "India", required: true },
-    landmark: { type: String, default: "" },
+    landmark: { type: String, default: "" , required: true },
     addressType: {
       type: String,
       enum: ["home", "work", "other"],

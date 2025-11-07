@@ -31,10 +31,8 @@ export default function OrderCreationPage() {
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
 
-  // ✅ Access global context
   const { orderData, setOrderData } = useOrder();
 
-  // initialize from context if available
   const [form, setForm] = useState({
     userName: orderData.user?.name || "",
     userEmail: orderData.user?.email || "",
@@ -69,7 +67,6 @@ export default function OrderCreationPage() {
         ]
   );
 
-  // --- File Upload Function ---
   const handleFileUpload = useCallback(async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
@@ -81,7 +78,6 @@ export default function OrderCreationPage() {
     return data.url || "";
   }, []);
 
-  // --- Add Product ---
   const addProduct = useCallback(() => {
     setProducts((prev) => [
       ...prev,

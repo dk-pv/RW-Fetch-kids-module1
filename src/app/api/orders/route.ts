@@ -108,6 +108,7 @@ export async function POST(req: Request) {
       locality: addr.locality || "",
       street: addr.street || "",
       city: addr.city || "",
+        district: addr.district || "",
       state: addr.state || "",
       country: addr.country || "India",
       landmark: addr.landmark || "",

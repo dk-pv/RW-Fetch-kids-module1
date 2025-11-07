@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { OrderProvider } from "@/context/OrderContext"; 
 
 export const metadata: Metadata = {
   title: "Fetch Kids - Order Flow",
@@ -13,7 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-gray-50 text-gray-800">{children}</body>
+      <body className="bg-gray-50 text-gray-800">
+        <OrderProvider>
+          {children}
+        </OrderProvider>
+      </body>
     </html>
   );
 }

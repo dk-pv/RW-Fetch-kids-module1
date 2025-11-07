@@ -32,13 +32,14 @@ const ProductSchema = new Schema({
 
 const ShippingAddressSchema = new Schema(
   {
-    userName: { type: String, required: true }, 
+    userName: { type: String, required: true },
     phone: { type: String, required: true },
     alternatePhone: { type: String, required: true },
-    postalCode: { type: String, required: true }, 
-    locality: { type: String, required: true }, 
-    street: { type: String, required: true }, 
-    city: { type: String, required: true }, 
+    postalCode: { type: String, required: true },
+    locality: { type: String, required: true },
+    street: { type: String, required: true },
+    city: { type: String, required: true },
+    district: { type: String, required: true },
     state: { type: String, required: true },
     country: { type: String, default: "India", required: true },
     landmark: { type: String, default: "" },
@@ -49,7 +50,7 @@ const ShippingAddressSchema = new Schema(
       required: true,
     },
   },
-  { _id: false } 
+  { _id: false }
 );
 
 const OrderSchema = new Schema(

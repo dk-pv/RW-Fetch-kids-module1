@@ -24,46 +24,15 @@ type ProductType = {
   previewUrl: string;
 };
 
-type AddressType = {
-  userName: string;
-  phone: string;
-  alternatePhone: string;
-  postalCode: string;
-  locality: string;
-  street: string;
-  city: string;
-  state: string;
-  country: string;
-  landmark: string;
-  addressType: string;
-};
-
 export default function OrderPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
-  const [showAddressModal, setShowAddressModal] = useState(false);
-  const [isFetchingPincode, setIsFetchingPincode] = useState(false);
-  const [pincodeError, setPincodeError] = useState("");
 
   const [form, setForm] = useState({
     userName: "",
     userEmail: "",
     phone: "",
-  });
-
-  const [address, setAddress] = useState<AddressType>({
-    userName: "",
-    phone: "",
-    alternatePhone: "",
-    postalCode: "",
-    locality: "",
-    street: "",
-    city: "",
-    state: "",
-    country: "India",
-    landmark: "",
-    addressType: "home",
   });
 
   const [products, setProducts] = useState<ProductType[]>([
@@ -85,6 +54,7 @@ export default function OrderPage() {
     },
   ]);
 
+  // --- File Upload Function ---
   const handleFileUpload = useCallback(async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -96,6 +66,7 @@ export default function OrderPage() {
     return data.url || "";
   }, []);
 
+  // --- Add Product ---
   const addProduct = useCallback(() => {
     setProducts((prev) => [
       ...prev,
@@ -118,6 +89,7 @@ export default function OrderPage() {
     ]);
   }, []);
 
+  // --- Product Change Handler ---
   const handleProductChange = useCallback(
     (index: number, field: string, value: any) => {
       setProducts((prev) =>
@@ -127,19 +99,7 @@ export default function OrderPage() {
     []
   );
 
-  const handleCustomizationChange = useCallback(
-    (index: number, field: string, value: any) => {
-      setProducts((prev) =>
-        prev.map((p, i) =>
-          i === index
-            ? { ...p, customization: { ...p.customization, [field]: value } }
-            : p
-        )
-      );
-    },
-    []
-  );
-
+  // --- Customization Text Change ---
   const handleTextDataChange = useCallback(
     (index: number, key: string, value: any) => {
       setProducts((prev) =>
@@ -159,6 +119,7 @@ export default function OrderPage() {
     []
   );
 
+  // --- Image Upload Handler ---
   const handleImageChange = useCallback(
     async (index: number, file: File | null) => {
       if (!file) return;
@@ -187,114 +148,16 @@ export default function OrderPage() {
     [handleFileUpload]
   );
 
+  // --- Submit Form Handler ---
   const handleSubmit = (e: any) => {
     e.preventDefault();
-    setAddress((a) => ({
-      ...a,
-      userName: form.userName,
-      phone: form.phone,
-    }));
-    setShowAddressModal(true);
-  };
 
-  const handlePincodeChange = async (value: string) => {
-    setAddress((a) => ({ ...a, postalCode: value }));
-    setPincodeError("");
-    if (value.length === 6) {
-      setIsFetchingPincode(true);
-      try {
-        const res = await fetch(
-          `https://api.postalpincode.in/pincode/${value}`
-        );
-        const data = await res.json();
-        if (Array.isArray(data) && data[0]?.Status === "Success") {
-          const postOffice = data[0].PostOffice?.[0];
-          setAddress((a) => ({
-            ...a,
-            city: postOffice?.District || "",
-            state: postOffice?.State || "",
-          }));
-        } else {
-          setPincodeError("Invalid Pincode or not found");
-        }
-      } catch {
-        setPincodeError("Failed to fetch location");
-      } finally {
-        setIsFetchingPincode(false);
-      }
-    }
-  };
-
-  const handleConfirmCheckout = async () => {
-    setLoading(true);
-    setShowAddressModal(false);
-
-    const subtotal = products.reduce(
-      (sum, p) => sum + Number(p.price || 0) * Number(p.quantity || 0),
-      0
+    // navigate to location page and pass only name & phone
+    router.push(
+      `/order/location?name=${encodeURIComponent(
+        form.userName
+      )}&phone=${encodeURIComponent(form.phone)}`
     );
-
-    const orderProducts = products.map((p) => {
-      const hasCustomization =
-        p.isCustomized ||
-        Object.values(p.customization.textData).some((v) => !!v) ||
-        (p.customization.photoUrls?.length ?? 0) > 0 ||
-        !!p.customization.font ||
-        !!p.customization.style;
-
-      return {
-        name: p.name,
-        price: Number(p.price || 0),
-        quantity: Number(p.quantity || 0),
-        isCustomized: hasCustomization,
-        imageUrl: p.previewUrl || "",
-        customization: hasCustomization
-          ? {
-              isCustomized: true,
-              textData: p.customization.textData,
-              photoUrls: p.customization.photoUrls || [],
-              font: p.customization.font,
-              color: p.customization.color,
-              style: p.customization.style,
-              isCartoonStyle: p.customization.isCartoonStyle,
-              previewImage: p.previewUrl || "",
-              printFile: "",
-            }
-          : {},
-      };
-    });
-
-    const orderData = {
-      userName: form.userName,
-      userEmail: form.userEmail,
-      phone: form.phone,
-      products: orderProducts,
-      subtotal,
-      tax: 0,
-      shipping: 0,
-      total: subtotal,
-      shippingAddress: address,
-      paymentMethod: "cod",
-    };
-
-    try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData),
-      });
-      const data = await res.json();
-      setLoading(false);
-
-      if (data?.success) {
-        router.push(`/order/checkout/${data.order.orderNumber}`);
-      } else {
-        alert("Order creation failed: " + (data?.message || "Server error"));
-      }
-    } catch {
-      setLoading(false);
-      alert("Network error");
-    }
   };
 
   return (
@@ -327,6 +190,7 @@ export default function OrderPage() {
           value={form.phone}
           onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
           className="border p-2 rounded"
+          required
         />
 
         <h2 className="text-lg font-medium mt-6">Products</h2>
@@ -430,157 +294,10 @@ export default function OrderPage() {
             disabled={loading || isPending}
             className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? "Processing..." : "Submit Order"}
+            {loading ? "Processing..." : "Continue to Address"}
           </button>
         </div>
       </form>
-
-      {showAddressModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold mb-4 text-center">
-              Enter Shipping Address
-            </h2>
-
-            <div className="grid gap-3">
-              <input
-                placeholder="Full Name"
-                value={address.userName}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, userName: e.target.value }))
-                }
-                className="border p-2 rounded"
-              />
-              <input
-                placeholder="Mobile Number"
-                value={address.phone}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, phone: e.target.value }))
-                }
-                className="border p-2 rounded"
-              />
-              <input
-                placeholder="Alternate Phone"
-                value={address.alternatePhone}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, alternatePhone: e.target.value }))
-                }
-                className="border p-2 rounded"
-              />
-              <input
-                placeholder="Pincode"
-                value={address.postalCode}
-                onChange={(e) => handlePincodeChange(e.target.value)}
-                className="border p-2 rounded"
-                maxLength={6}
-              />
-              {isFetchingPincode && (
-                <p className="text-sm text-gray-500">Fetching location...</p>
-              )}
-              {pincodeError && (
-                <p className="text-sm text-red-600">{pincodeError}</p>
-              )}
-              <input
-                placeholder="Locality / Area"
-                value={address.locality}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, locality: e.target.value }))
-                }
-                className="border p-2 rounded"
-              />
-              <input
-                placeholder="Address (House No / Building)"
-                value={address.street}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, street: e.target.value }))
-                }
-                className="border p-2 rounded"
-              />
-              <input
-                placeholder="City"
-                value={address.city}
-                readOnly
-                className="border p-2 rounded bg-gray-100"
-              />
-              <input
-                placeholder="State"
-                value={address.state}
-                readOnly
-                className="border p-2 rounded bg-gray-100"
-              />
-              <input
-                placeholder="Country"
-                value={address.country}
-                readOnly
-                className="border p-2 rounded bg-gray-100"
-              />
-              <input
-                placeholder="Landmark (Optional)"
-                value={address.landmark}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, landmark: e.target.value }))
-                }
-                className="border p-2 rounded"
-              />
-
-              <div className="flex items-center gap-4 mt-2">
-                <label>
-                  <input
-                    type="radio"
-                    name="addressType"
-                    value="home"
-                    checked={address.addressType === "home"}
-                    onChange={(e) =>
-                      setAddress((a) => ({ ...a, addressType: e.target.value }))
-                    }
-                  />{" "}
-                  Home
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="addressType"
-                    value="work"
-                    checked={address.addressType === "work"}
-                    onChange={(e) =>
-                      setAddress((a) => ({ ...a, addressType: e.target.value }))
-                    }
-                  />{" "}
-                  Work
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="addressType"
-                    value="other"
-                    checked={address.addressType === "other"}
-                    onChange={(e) =>
-                      setAddress((a) => ({ ...a, addressType: e.target.value }))
-                    }
-                  />{" "}
-                  Other
-                </label>
-              </div>
-
-              <div className="flex justify-between mt-4">
-                <button
-                  onClick={() => setShowAddressModal(false)}
-                  className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmCheckout}
-                  disabled={loading}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  Continue to Checkout
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

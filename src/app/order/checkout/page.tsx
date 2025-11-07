@@ -69,7 +69,7 @@ export default function CheckoutPage() {
         setShowSuccess(true); 
         setTimeout(() => {
           clearOrder();
-          router.push(`/order/success?orderId=${data.order.orderNumber}`);
+          router.push(`/order}`);
         }, 2000);
       } else {
         alert(data?.message || "Order creation failed.");
@@ -88,7 +88,6 @@ export default function CheckoutPage() {
         Checkout Summary
       </h1>
 
-      {/* 🧾 Product Summary */}
       <div className="bg-white shadow rounded-lg p-5 mb-6">
         <h2 className="text-lg font-semibold mb-4 border-b pb-2">Products</h2>
         {orderData.products?.map(

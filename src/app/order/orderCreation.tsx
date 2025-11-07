@@ -1,7 +1,9 @@
 "use client";
 import React, { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useOrder } from "@/context/OrderContext";
 
+// local type for internal handling
 type ProductType = {
   name: string;
   price: string | number;
@@ -24,38 +26,51 @@ type ProductType = {
   previewUrl: string;
 };
 
-export default function OrderPage() {
+export default function OrderCreationPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
 
+  // ✅ Access global context
+  const { orderData, setOrderData } = useOrder();
+
+  // initialize from context if available
   const [form, setForm] = useState({
-    userName: "",
-    userEmail: "",
-    phone: "",
+    userName: orderData.user?.name || "",
+    userEmail: orderData.user?.email || "",
+    phone: orderData.user?.phone || "",
   });
 
-  const [products, setProducts] = useState<ProductType[]>([
-    {
-      name: "",
-      price: "",
-      quantity: "",
-      isCustomized: false,
-      customization: {
-        textData: { name: "", className: "", schoolName: "", section: "" },
-        font: "",
-        color: "#000000",
-        style: "",
-        photoUrls: [],
-        isCartoonStyle: false,
-      },
-      photoFile: null,
-      previewUrl: "",
-    },
-  ]);
+  const [products, setProducts] = useState<ProductType[]>(
+    (orderData.products as ProductType[])?.length
+      ? (orderData.products as ProductType[])
+      : [
+          {
+            name: "",
+            price: "",
+            quantity: "",
+            isCustomized: false,
+            customization: {
+              textData: {
+                name: "",
+                className: "",
+                schoolName: "",
+                section: "",
+              },
+              font: "",
+              color: "#000000",
+              style: "",
+              photoUrls: [],
+              isCartoonStyle: false,
+            },
+            photoFile: null,
+            previewUrl: "",
+          },
+        ]
+  );
 
   // --- File Upload Function ---
-  const handleFileUpload = useCallback(async (file: File) => {
+  const handleFileUpload = useCallback(async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", "fetchkids/orders/photos");
@@ -76,7 +91,12 @@ export default function OrderPage() {
         quantity: "",
         isCustomized: false,
         customization: {
-          textData: { name: "", className: "", schoolName: "", section: "" },
+          textData: {
+            name: "",
+            className: "",
+            schoolName: "",
+            section: "",
+          },
           font: "",
           color: "#000000",
           style: "",
@@ -91,7 +111,7 @@ export default function OrderPage() {
 
   // --- Product Change Handler ---
   const handleProductChange = useCallback(
-    (index: number, field: string, value: any) => {
+    (index: number, field: keyof ProductType, value: any) => {
       setProducts((prev) =>
         prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
       );
@@ -101,7 +121,7 @@ export default function OrderPage() {
 
   // --- Customization Text Change ---
   const handleTextDataChange = useCallback(
-    (index: number, key: string, value: any) => {
+    (index: number, key: keyof ProductType["customization"]["textData"], value: string) => {
       setProducts((prev) =>
         prev.map((p, i) =>
           i === index
@@ -119,7 +139,7 @@ export default function OrderPage() {
     []
   );
 
-  // --- Image Upload Handler ---
+  // --- Image Upload Handler (⚡ keep same behaviour, no change) ---
   const handleImageChange = useCallback(
     async (index: number, file: File | null) => {
       if (!file) return;
@@ -138,26 +158,56 @@ export default function OrderPage() {
                   ...p,
                   previewUrl: cloudUrl,
                   photoFile: null,
-                  customization: { ...p.customization, photoUrls: [cloudUrl] },
+                  customization: {
+                    ...p.customization,
+                    photoUrls: [cloudUrl],
+                  },
                 }
               : p
           )
         );
-      } catch {}
+      } catch (err) {
+        console.error("Upload failed:", err);
+      }
     },
     [handleFileUpload]
   );
 
   // --- Submit Form Handler ---
-  const handleSubmit = (e: any) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
-    // navigate to location page and pass only name & phone
-    router.push(
-      `/order/location?name=${encodeURIComponent(
-        form.userName
-      )}&phone=${encodeURIComponent(form.phone)}`
-    );
+    // ✅ Store data in global context + localStorage
+    setOrderData({
+      ...orderData,
+      user: {
+        name: form.userName,
+        email: form.userEmail,
+        phone: form.phone,
+      },
+      products: products.map((p) => ({
+        name: p.name,
+        price: p.price,
+        quantity: p.quantity,
+        isCustomized: p.isCustomized,
+        customization: {
+          textData: p.customization.textData,
+          font: p.customization.font,
+          color: p.customization.color,
+          style: p.customization.style,
+          photoUrls: p.customization.photoUrls,
+          isCartoonStyle: p.customization.isCartoonStyle,
+        },
+        previewUrl: p.previewUrl,
+      })),
+    });
+
+    startTransition(() => {
+      router.push("/order/location");
+    });
+
+    setLoading(false);
   };
 
   return (
@@ -166,18 +216,21 @@ export default function OrderPage() {
         Create New Order
       </h1>
 
-      {/* Order Form */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* 🧍 Customer Info */}
         <h2 className="text-lg font-medium">Customer Info</h2>
         <input
           placeholder="Full Name"
           value={form.userName}
-          onChange={(e) => setForm((f) => ({ ...f, userName: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, userName: e.target.value }))
+          }
           className="border p-2 rounded"
           required
         />
         <input
           placeholder="Email"
+          type="email"
           value={form.userEmail}
           onChange={(e) =>
             setForm((f) => ({ ...f, userEmail: e.target.value }))
@@ -187,12 +240,14 @@ export default function OrderPage() {
         />
         <input
           placeholder="Phone"
+          type="tel"
           value={form.phone}
           onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
           className="border p-2 rounded"
           required
         />
 
+        {/* 🛍 Products Section */}
         <h2 className="text-lg font-medium mt-6">Products</h2>
         {products.map((p, index) => (
           <div key={index} className="border rounded p-4 mb-4">
@@ -223,6 +278,8 @@ export default function OrderPage() {
               className="border p-2 rounded mb-2"
               required
             />
+
+            {/* Customize toggle */}
             <div className="flex items-center gap-2 mb-2">
               <input
                 type="checkbox"
@@ -233,6 +290,8 @@ export default function OrderPage() {
               />
               <label>Customize?</label>
             </div>
+
+            {/* 🧩 Customization Details */}
             {p.isCustomized && (
               <div className="border-t pt-3">
                 <h3 className="font-medium mb-2">Customization</h3>
@@ -260,6 +319,8 @@ export default function OrderPage() {
                   }
                   className="border p-2 rounded mb-2"
                 />
+
+                {/* 🖼 Photo Upload (no change) */}
                 <h4>Upload Photo</h4>
                 <input
                   type="file"
@@ -281,6 +342,7 @@ export default function OrderPage() {
           </div>
         ))}
 
+        {/* Buttons */}
         <div className="flex gap-2">
           <button
             type="button"

@@ -74,6 +74,8 @@ const OrderSchema = new Schema(
     shippingAddress: { type: ShippingAddressSchema, required: true },
 
     paymentMethod: { type: String, default: "cod", required: true },
+    paymentTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: "PaymentTransaction" },
+
     paymentStatus: { type: String, default: "pending" },
     stripeSessionId: String,
     stripePaymentIntentId: String,

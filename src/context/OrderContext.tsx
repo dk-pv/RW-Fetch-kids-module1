@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 type UserInfo = {
+  _id?: string;
   name: string;
   email: string;
   phone: string;
@@ -70,25 +71,49 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     shippingAddress: undefined,
   });
 
+  // ✅ Auto-sync logged user from localStorage
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("fetchkids_order");
-      if (saved) {
-        try {
-          setOrderData(JSON.parse(saved));
-        } catch (err) {
-          console.error("Failed to parse saved order:", err);
-        }
+    if (typeof window === "undefined") return;
+    const savedUser = localStorage.getItem("fetchkids_user");
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setOrderData((prev) => ({
+          ...prev,
+          user: {
+            _id: parsedUser._id,
+            name: parsedUser.name || prev.user.name,
+            email: parsedUser.email || prev.user.email,
+            phone: parsedUser.phone || prev.user.phone || "",
+          },
+        }));
+      } catch (err) {
+        console.error("Failed to parse user:", err);
       }
     }
   }, []);
 
+  // ✅ Restore previous order data (if user navigates back)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem("fetchkids_order");
+    if (saved) {
+      try {
+        setOrderData(JSON.parse(saved));
+      } catch (err) {
+        console.error("Failed to parse saved order:", err);
+      }
+    }
+  }, []);
+
+  // ✅ Save order data to localStorage on every change
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("fetchkids_order", JSON.stringify(orderData));
     }
   }, [orderData]);
 
+  // ✅ Clear all order info
   const clearOrder = () => {
     setOrderData({
       user: { name: "", email: "", phone: "" },
